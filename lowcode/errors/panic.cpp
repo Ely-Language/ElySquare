@@ -4,8 +4,19 @@ constexpr int MAX_FRAMES = 64;
 
 [[noreturn]] void triggerPanic(ErrorCode code, const char* message, const char* file, int line) {
     void* stackBuffer[MAX_FRAMES];
+    int numcode;
+    switch (code) {
+        case ErrorCode::Success: numcode = 0; break;
+        case ErrorCode::OutOfMemory: numcode = 1; break;
+        case ErrorCode::DanglingPointerAccess: numcode = 2; break;
+        case ErrorCode::TypeNotRegistered: numcode = 3; break;
+        case ErrorCode::MailboxKeyNotFound: numcode = 4; break;
+        case ErrorCode::SafepointTimeout: numcode = 5; break;
+        case ErrorCode::ContainerContainsOther: numcode = 6; break;
+        default: numcode = -1; break;
+    }
     // printing error
-    std::cerr << "[ElySquare][PANIC][" << file << ':' << line << "]: " << message << "\n";
+    std::cerr << "[ElySquare][PANIC][ERROR CODE:" << numcode << "][" << file << ':' << line << "]: " << message << "\n";
 // STACKTRACE DUMP
 // WIN32
 #if defined(ESL_OS_WINDOWS)

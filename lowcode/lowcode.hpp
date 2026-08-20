@@ -10,3 +10,8 @@
     #define ESL_OS_LINUX
     #endif
 #endif
+
+// ELYSQUARE LOWCODE MARCOS
+
+// MAX MEMORY PAGES COUNT
+#define ESLM_MAX_PAGE_COUNT

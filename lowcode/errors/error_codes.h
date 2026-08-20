@@ -1,6 +1,8 @@
 // error codes
 // ===============
 
+namespace es {
+
 // different error codes for ElySquare
 enum class ErrorCode {
     Success=0,               // 0 - no errors
@@ -11,3 +13,5 @@ enum class ErrorCode {
     SafepointTimeout=5,      // 5 - thread didn't recognized GC stop command
     ContainerContainsOther=6 // 6 - this container has no thing with that property
 };
+
+}

@@ -17,6 +17,9 @@
     #endif
 #endif
 
+namespace es {
+
+// writting error message & dump to the console
 [[noreturn]] void triggerPanic(
     ErrorCode code,      // Error Code
     const char* message, // Error Message
@@ -24,7 +27,10 @@
     int line             // Line number
 );
 
+
 // TODO AFTER HANDLES
 // void registerPanicCallback(
 //     PanicHandlerFunc callback, // ptr: void(*)(ErrorCode, const char*)
 // );
+
+}

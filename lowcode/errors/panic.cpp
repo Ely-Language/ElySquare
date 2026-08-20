@@ -2,6 +2,8 @@
 
 constexpr int MAX_FRAMES = 64;
 
+namespace es {
+
 [[noreturn]] void triggerPanic(ErrorCode code, const char* message, const char* file, int line) {
     void* stackBuffer[MAX_FRAMES];
     int numcode;
@@ -41,4 +43,6 @@ constexpr int MAX_FRAMES = 64;
 #endif
     std::cerr << "[ElySquare][PANIC] Stacktrace end";
     std::abort();
+}
+
 }

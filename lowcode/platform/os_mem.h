@@ -31,8 +31,22 @@ namespace ESLowcode {
 // @details it will allocate the closest value to `bytes` (value // 4)
 void* allocatePages(size_t bytes, PagePermissions flag);
 
+// reserves page in kbytes
+void* reservePages(size_t bytes);
+
+// commits bytes to reserved address
+bool commitPages(void* address, size_t bytes, PagePermissions flag);
+
+// decomits bytes from reserved address
+bool decommitPages(void* address, size_t bytes);
+
+// returns reserved pages to OS
+bool releaseReservedPages(void* address, size_t bytes);
+
 // returns allocated memory pages to system
-bool freePages(void* address, size_t bytes);
+inline bool freePages(void* address, size_t bytes) {
+    return ::ESLowcode::releaseReservedPages(address, bytes);
+}
 
 // changes permissions of chosen memory page
 bool protectPages(void* address, size_t bytes, PagePermissions flag);

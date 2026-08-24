@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstring>
 #include <iostream>
+#include <bit>
 
 #include "platform/atomics.h"
 #include "platform/os_mem.h"
@@ -14,66 +15,44 @@
 
 PagePermissions DEFAULT_PAGE_PERMISSION = PagePermissions::ReadWriteExecute;
 
-#ifndef ESLM_MAX_PAGE_COUNT
-    #define ESLM_MAX_PAGE_COUNT 65536
+#ifndef ESLM_MEMORY_CHUNK_SIZE
+    #define ESLM_MEMORY_CHUNK_SIZE 8589934592ULL
 #endif
 #ifndef ESL_PAGE_SIZE
-    #define ESL_PAGE_SIZE 4096
+    #define ESL_PAGE_SIZE 4096ULL
 #endif
+#define CAGE_PAGES_COUNT 2097152ULL
+#define BITMAP_WORDS 32768ULL
 
 namespace es { // ElySquare main namespace
 
-// ElySquare runtime page allocator
-class RuntimePageAllocator {
+class PageManager {
 private:
-    static constexpr size_t MAX_PAGES = ESLM_MAX_PAGE_COUNT; // so we can change it
-    static constexpr size_t BITMAP_SIZE = MAX_PAGES / 64;
+    struct CageSegment {
+        uint8_t* baseAddress;
+        uint64_t bitmap[BITMAP_WORDS];
+        CageSegment* next;
+    };
+    
+    CageSegment* head;
+    CageSegment* current;
+    
+    uint64_t totalReserved;
+    uint64_t totalCommited;
+    uint64_t totalFree;
 
-    uint64_t m_allocationBitmap[BITMAP_SIZE];
-    void* m_trackedAddresses[MAX_PAGES];
-    size_t m_trackedPageCounts[MAX_PAGES];
+    inline uint32_t findFirstZeroBit(uint64_t word);
 
-    uint8_t* m_baseAddress;
-    size_t m_totalBytes;
-
-    intptr_t findFreeSlot();
+    void* createNewSegmentAndAllocate(size_t pageCount);
 
 public:
-    // Constructor
-    RuntimePageAllocator();
+    PageManager();
 
-    // Destructor
-    ~RuntimePageAllocator();
+    ~PageManager();
 
-    // Allocate a page
     void* requestPageChunk(size_t pageCount);
 
-    void releasePageChunk(void* address, size_t pageCount);
+    void releasePageChunk(void* ptr, size_t pageCount);
 };
 
-static RuntimePageAllocator ESPageAllocator;
-
-// requests a chunk of memory | дай кусочек памяти
-inline void* requestPageChunk(
-    size_t pageCount     // count of requested pages (page = 4kb)
-) {
-ESPageAllocator.requestPageChunk(pageCount);
 }
-
-// returns allocated page chunk to OS
-inline void releasePageChunk(
-    void* ptr,         // address
-    size_t pageCount   // count of returned pages
-) {
-ESPageAllocator.releasePageChunk(ptr, pageCount);
-}
-
-// switches pages to NoAccess mode
-inline void poisonPages(
-    void* ptr,       // base address
-    size_t pageCount // count of pages you want protect to
-) {
-size_t bytesToFree = pageCount * ESL_PAGE_SIZE;
-::ESLowcode::protectPages(ptr, bytesToFree, PagePermissions::NoAccess);
-}
-} // namespace es

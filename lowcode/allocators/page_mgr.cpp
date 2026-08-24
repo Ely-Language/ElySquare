@@ -2,110 +2,120 @@
 
 namespace es {
 
-RuntimePageAllocator::RuntimePageAllocator() {
-    ::std::memset(m_allocationBitmap, 0, sizeof(m_allocationBitmap));
-    ::std::memset(m_trackedAddresses, 0, sizeof(m_trackedAddresses));
-    ::std::memset(m_trackedPageCounts, 0, sizeof(m_trackedPageCounts));
-}
-
-RuntimePageAllocator::~RuntimePageAllocator() {
-    for (size_t i = 0; i < MAX_PAGES; i++) {
-        if (m_trackedAddresses[i] != nullptr) {
-            void* address = m_trackedAddresses[i];
-            size_t bytesToFree = m_trackedPageCounts[i] * ESL_PAGE_SIZE;
-
-            // DUMP
-            #ifdef ESL_DEBUG
-                std::cerr << "[ElySquare][DEBUG][Lowcode][RuntimePageAllocator]"
-                          << "FOUNDED MEMORY LEAK AT ALLOCATORS LEVEL!\n"; 
-            #endif
-
-            ::ESLowcode::freePages(address, bytesToFree);
-
-            m_trackedAddresses[i] = nullptr;
-            m_trackedPageCounts[i] = 0;
-        }
+inline uint32_t PageManager::findFirstZeroBit(uint64_t word) {
+    if (word == 0xFFFFFFFFFFFFFFFFULL) {
+        ::es::triggerPanic(::es::ErrorCode::OutOfMemory, "Error: invalid word code", "ElySquare/lowcode/allocators/page_mgr.cpp", __LINE__ - 1);
+        return 0;
     }
+    return static_cast<uint32_t>(std::__countr_zero(~word));
 }
 
-intptr_t RuntimePageAllocator::findFreeSlot() {
-    for (size_t i = 0; i < BITMAP_SIZE; i++) {
-        if (m_allocationBitmap[i] != 0xFFFFFFFFFFFFFFFFULL) {
-            for (size_t bit = 0; bit < 64; bit++) {
-                if ((m_allocationBitmap[i] & (1ULL << bit)) == 0) {
-                    return (i * 64) + bit;
+PageManager::PageManager() {
+    CageSegment* segment = new CageSegment();
+
+    void* start = ::ESLowcode::reservePages(ESLM_MEMORY_CHUNK_SIZE);
+    if (start == nullptr) ::es::triggerPanic(::es::ErrorCode::OutOfMemory, "Failed reservation of Cage Segment", "ElySquare/lowcode/allocators/page_mgr.cpp", __LINE__ - 1);
+    segment->baseAddress = static_cast<uint8_t*>(start);
+
+    memset(segment->baseAddress, 0, sizeof(segment->bitmap));
+
+    segment->next = nullptr;
+
+    head = segment;
+    current = segment;
+}
+
+void* PageManager::requestPageChunk(size_t pageCount) {
+    CageSegment* atCheck = current;
+
+    while (atCheck != nullptr) {
+        for (size_t i = 0; i < BITMAP_WORDS; i++) {
+            if (atCheck->bitmap[i] == 0xFFFFFFFFFFFFFFFFULL) continue;
+            uint32_t bitIdx = findFirstZeroBit(atCheck->bitmap[i]);
+            uint32_t startIndex = (i * 64) + bitIdx;
+
+            // check if we can use current segment
+            if (startIndex + pageCount > CAGE_PAGES_COUNT) [[unlikely]] break;
+            
+            bool isFree = true;
+            for (size_t j = 0; j < pageCount; j++) {
+                size_t wordIndex = (startIndex + j) / 64;
+                size_t bitOffset = (startIndex + j) % 64;
+                if ((atCheck->bitmap[wordIndex] & (1ULL << bitOffset)) != 0) {
+                    isFree = false;
+                    break;
                 }
             }
+
+            if (isFree) [[likely]] {
+                for (size_t j = 0; j < pageCount; j++) {
+                    size_t wordIndex = (startIndex + j) / 64;
+                    size_t bitOffset = (startIndex + j) % 64;
+                    atCheck->bitmap[wordIndex] |= (1ULL << bitOffset);
+                }
+
+                uint8_t* targetPtr = atCheck->baseAddress + (startIndex * ESL_PAGE_SIZE);
+                ::ESLowcode::commitPages(targetPtr, pageCount * ESL_PAGE_SIZE, PagePermissions::ReadWrite);
+                return targetPtr;
+            }
         }
+
+        atCheck = atCheck->next;
     }
-    return -1;
+
+    createNewSegmentAndAllocate(pageCount);
 }
 
-void* RuntimePageAllocator::requestPageChunk(size_t pageCount) {
-    if (pageCount == 0) return nullptr;
+void* PageManager::createNewSegmentAndAllocate(size_t pageCount) {
+    CageSegment* segment = new CageSegment();
+
+    void* start = ::ESLowcode::reservePages(ESLM_MEMORY_CHUNK_SIZE);
+    if (start == nullptr) ::es::triggerPanic(::es::ErrorCode::OutOfMemory, "Failed reservation of Cage Segment", "ElySquare/lowcode/allocators/page_mgr.cpp", __LINE__ - 1);
+    segment->baseAddress = static_cast<uint8_t*>(start);
+
+    memset(segment->baseAddress, 0, sizeof(segment->bitmap));
+
+    segment->next = nullptr;
+
+    current->next = segment;
+    current = segment;
     
-    size_t bytesToAllocate = pageCount * ESL_PAGE_SIZE;
-
-    void* allocatedAddress = ::ESLowcode::allocatePages(bytesToAllocate, PagePermissions::ReadWrite);
-
-    if (allocatedAddress == nullptr) {
-        triggerPanic(
-            ErrorCode::OutOfMemory,
-            "OS denied allocation request",
-            "ElySquare/lowcode/allocators/page_mgr.cpp",
-            39
-        );
-    }
-
-    intptr_t slot = findFreeSlot();
-    if (slot != -1) {
-        size_t wordIdx = slot / 64;
-        size_t bitIdx = slot % 64;
-
-        m_allocationBitmap[wordIdx] |= (1ULL << bitIdx);
-        m_trackedAddresses[slot] = allocatedAddress;
-        m_trackedPageCounts[slot] = pageCount;
-    } else {
-        ::ESLowcode::freePages(allocatedAddress, bytesToAllocate);
-        triggerPanic(
-            ErrorCode::OutOfMemory,
-            "Out of memory bitmap space",
-            "ElySquare/lowcode/allocators/page_mgr.cpp",
-            50
-        );
-    }
-
-    return allocatedAddress;
+    void* ptr = requestPageChunk(pageCount);
+    return ptr;
 }
 
-void RuntimePageAllocator::releasePageChunk(void* address, size_t pageCount) {
-    if (!address || pageCount == 0) return;
+void PageManager::releasePageChunk(void* ptr, size_t pageCount) {
+    uint8_t* address = static_cast<uint8_t*>(ptr);
 
-    size_t bytesToFree = pageCount * ESL_PAGE_SIZE;
-    bool osSuccess = ESLowcode::freePages(address, bytesToFree);
+    CageSegment* segment = head;
+    while (segment != nullptr) {
+        if (address >= segment->baseAddress && address < segment->baseAddress + ESLM_MEMORY_CHUNK_SIZE) [[likely]] {
+            size_t startIndex = (address - segment->baseAddress) / ESL_PAGE_SIZE;
 
-    if (!osSuccess) {
-        triggerPanic(
-            ErrorCode::OutOfMemory,
-            "Failed to free OS pages",
-            "ElySquare/lowcode/allocators/page_mgr.cpp",
-            73
-        );
-    }
+            for (size_t i = 0; i < pageCount; i++) {
+                size_t wordIndex = (startIndex + i) / 64;
+                size_t bitOffset = (startIndex + i) % 64;
+                segment->bitmap[wordIndex] &= ~(1ULL << bitOffset);
+            }
 
-    for (size_t i = 0; i < MAX_PAGES; i++) {
-        if (m_trackedAddresses[i] == address) {
-            m_trackedAddresses[i] = nullptr;
-            m_trackedPageCounts[i] = 0;
-
-            size_t wordIdx = i / 64;
-            size_t bitIdx = i% 64;
-            m_allocationBitmap[wordIdx] &= ~(1ULL << bitIdx);
-            break;
+            ::ESLowcode::decommitPages(address, pageCount * ESL_PAGE_SIZE);
+            return;
         }
+        segment = segment->next;
+    }
+    ::es::triggerPanic(::es::ErrorCode::OutOfMemory, "Invalid access to other's memory", "ElySquare/lowcode/allocators/page_mgr.cpp", __LINE__ - 8);
+}
+
+PageManager::~PageManager() {
+    CageSegment* current = head;
+    while (current != nullptr) {
+        CageSegment* next = current->next;
+        ::ESLowcode::releaseReservedPages(current->baseAddress, ESLM_MEMORY_CHUNK_SIZE);
+        delete current;
+        current = next;
     }
 }
 
-void poisonPages(void* ptr, size_t pageCount) {}
+
 
 } // namespace es

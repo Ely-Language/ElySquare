@@ -26,44 +26,69 @@ PageManager::PageManager() {
 }
 
 void* PageManager::requestPageChunk(size_t pageCount) {
-    CageSegment* atCheck = current;
+    if (pageCount == 0) [[unlikely]] return nullptr;
 
-    while (atCheck != nullptr) {
-        for (size_t i = 0; i < BITMAP_WORDS; i++) {
-            if (atCheck->bitmap[i] == 0xFFFFFFFFFFFFFFFFULL) continue;
-            uint32_t bitIdx = findFirstZeroBit(atCheck->bitmap[i]);
-            uint32_t startIndex = (i * 64) + bitIdx;
+    CageSegment* segment = current;
 
-            // check if we can use current segment
-            if (startIndex + pageCount > CAGE_PAGES_COUNT) [[unlikely]] break;
-            
-            bool isFree = true;
-            for (size_t j = 0; j < pageCount; j++) {
-                size_t wordIndex = (startIndex + j) / 64;
-                size_t bitOffset = (startIndex + j) % 64;
-                if ((atCheck->bitmap[wordIndex] & (1ULL << bitOffset)) != 0) {
-                    isFree = false;
-                    break;
-                }
+    while (segment != nullptr) {
+        size_t runLength = 0;
+        size_t runStart = 0;
+
+        auto commitAndReturn = [&](size_t startIdx) -> void* { // Pages fixation
+            for (size_t j = 0; j < pageCount; ++j) {
+                size_t idx = startIdx + j;
+                segment->bitmap[idx / 64] |= (1ULL << (idx % 64));
+            }
+            uint8_t* targetPtr = segment->baseAddress + (startIdx * ESL_PAGE_SIZE);
+            ::ESLowcode::commitPages(targetPtr, pageCount * ESL_PAGE_SIZE, PagePermissions::ReadWrite);
+            return targetPtr;
+        };
+
+        for (size_t i = 0; i < BITMAP_WORDS; ++i) {
+            uint64_t word = segment->bitmap[i];
+
+            if (word == ~0ULL) { // Fully occupied word
+                runLength = 0;
+                continue;
             }
 
-            if (isFree) [[likely]] {
-                for (size_t j = 0; j < pageCount; j++) {
-                    size_t wordIndex = (startIndex + j) / 64;
-                    size_t bitOffset = (startIndex + j) % 64;
-                    atCheck->bitmap[wordIndex] |= (1ULL << bitOffset);
+            if (word == 0ULL) { // Fully free
+                if (runLength == 0) runStart = i * 64;
+                runLength += 64;
+                
+                if (runLength >= pageCount) {
+                    return commitAndReturn(runStart);
                 }
+                continue;
+            }
 
-                uint8_t* targetPtr = atCheck->baseAddress + (startIndex * ESL_PAGE_SIZE);
-                ::ESLowcode::commitPages(targetPtr, pageCount * ESL_PAGE_SIZE, PagePermissions::ReadWrite);
-                return targetPtr;
+            for (size_t b = 0; b < 64; ) {
+                if (((word >> b) & 1) == 0) {
+                    uint64_t temp = word >> b;
+                    int count = std::__countr_zero(temp);
+                    int zeros = (count > (64 - static_cast<int>(b))) ? (64 - static_cast<int>(b)) : count;
+
+                    if (runLength == 0) runStart = i * 64 + b;
+                    runLength += zeros;
+                    b += zeros;
+
+                    if (runLength >= pageCount) {
+                        return commitAndReturn(runStart);
+                    }
+                } else {
+                    uint64_t temp = ~(word >> b);
+                    int count = std::__countr_zero(temp);
+                    int ones = (count > (64 - static_cast<int>(b))) ? (64 - static_cast<int>(b)) : count;
+                    
+                    runLength = 0;
+                    b += ones;
+                }
             }
         }
-
-        atCheck = atCheck->next;
+        segment = segment->next;
     }
 
-    createNewSegmentAndAllocate(pageCount);
+    return createNewSegmentAndAllocate(pageCount);
 }
 
 void* PageManager::createNewSegmentAndAllocate(size_t pageCount) {

@@ -55,6 +55,6 @@ public:
     void releasePageChunk(void* ptr, size_t pageCount);
 };
 
-static PageManager ESPageManager;
+inline PageManager ESPageManager;
 
 }

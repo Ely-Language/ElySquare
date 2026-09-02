@@ -20,7 +20,7 @@ inline void Arena::clearChunks() {
     return;
 }
 
-explicit Arena::Arena(size_t defaultChunkSize = 1048576ULL) {
+Arena::Arena(size_t defaultChunkSize = 1048576ULL) {
     Chunk* chunk = new Chunk(defaultChunkSize);
     head = chunk;
     current = chunk;

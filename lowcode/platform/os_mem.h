@@ -1,5 +1,6 @@
 // OS memory management | Взаимодействие с памятью ОС
 // ==================================================
+#pragma once
 
 #include <stdint.h>
 #include <stddef.h>

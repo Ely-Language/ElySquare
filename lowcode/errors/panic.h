@@ -1,5 +1,6 @@
 // panic mechanic
 // ===============
+#pragma once
 
 #include <iostream>
 #include "error_codes.h"

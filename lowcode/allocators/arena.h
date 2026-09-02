@@ -1,4 +1,5 @@
 // Arena
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -60,7 +61,7 @@ public:
     Arena(Arena&&) noexcept;
     Arena& operator=(Arena&&) noexcept;
 
-    explicit Arena(size_t defaultChunkSize = 1048576ULL);
+    Arena(size_t defaultChunkSize = 1048576ULL);
     ~Arena();
 
     // Allocate memory in this arena.

@@ -1,5 +1,6 @@
 // error codes
 // ===============
+#pragma once
 
 namespace es {
 

@@ -1,5 +1,6 @@
 // virtual pages manager
 // ======================
+#pragma once
 
 #include <cstdint>
 #include <cstddef>

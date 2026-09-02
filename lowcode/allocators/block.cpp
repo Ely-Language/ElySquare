@@ -2,7 +2,7 @@
 
 namespace es {
 
-BlockAllocator::BlockAllocator(size_t elemSize, size_t blocksCount, size_t align = alignof(::std::max_align_t)) {
+BlockAllocator::BlockAllocator(size_t elemSize, size_t blocksCount, size_t align) {
     size_t alignedSize = (elemSize + align - 1) & ~(align - 1);
     
     blockSize = (alignedSize < sizeof(FreeBlock)) ? sizeof(FreeBlock) : alignedSize;

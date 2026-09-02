@@ -31,7 +31,7 @@ Arena::~Arena() {
     clearChunks();
 }
 
-void* Arena::alloc(size_t bytes, size_t alignment = alignof(::std::max_align_t)) noexcept {
+void* Arena::alloc(size_t bytes, size_t alignment) noexcept {
     Chunk* chunk = current; 
 
     // Align to

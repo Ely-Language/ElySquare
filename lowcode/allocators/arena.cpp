@@ -6,7 +6,6 @@ inline void Arena::expandByNewChunk(size_t size) {
     Chunk* chunk = new Chunk(size);
     current->next = chunk;
     current = chunk;
-    return;
 }
 
 inline void Arena::clearChunks() {
@@ -17,7 +16,6 @@ inline void Arena::clearChunks() {
         delete chunk;
         chunk = nextchunk;
     }
-    return;
 }
 
 Arena::Arena(size_t defaultChunkSize = 1048576ULL) {
@@ -34,27 +32,38 @@ Arena::~Arena() {
 void* Arena::alloc(size_t bytes, size_t alignment) noexcept {
     Chunk* chunk = current; 
 
-    // Align to
-    size_t alignedOffset = (chunk->offset + alignment - 1) & ~(alignment - 1);
+    size_t alignedOffset = alignForward(chunk->offset, alignment);
 
     if (alignedOffset + bytes > chunk->capacity) [[unlikely]] {
-        if (bytes <= defaultSize) [[likely]] { // Fit it into standard block?
-            Chunk* newchunk = new Chunk(defaultSize);
-            chunk->next = newchunk;
-            chunk = newchunk;
-            current = newchunk;
-            alignedOffset = (chunk->offset + alignment - 1) & ~(alignment - 1);
-        } else { // Ah no we need to make oversized chunk 
-            Chunk* oversized = new Chunk(bytes);
-            oversized->next = head->next;
-            head->next = oversized;
-            chunk = oversized;
-            alignedOffset = (chunk->offset + alignment - 1) & ~(alignment - 1);
-        }
+        size_t nextChunkSize = (bytes <= defaultSize) ? defaultSize : bytes;
+        
+        Chunk* newchunk = new Chunk(nextChunkSize);
+        chunk->next = newchunk;
+        current = newchunk;
+        chunk = newchunk;
+        
+        alignedOffset = alignForward(chunk->offset, alignment);
     }
+    
     void* result = chunk->data + alignedOffset;
     chunk->offset = alignedOffset + bytes;
     return result;
+}
+
+void Arena::popToMarker(Marker marker) noexcept {
+    if (!marker.chunk) [[unlikely]] return;
+
+    Chunk* toDelete = marker.chunk->next;
+    marker.chunk->next = nullptr;
+
+    while (toDelete != nullptr) {
+        Chunk* next = toDelete->next;
+        delete toDelete;
+        toDelete = next;
+    }
+
+    current = marker.chunk;
+    current->offset = marker.offset;
 }
 
 void Arena::clear() {

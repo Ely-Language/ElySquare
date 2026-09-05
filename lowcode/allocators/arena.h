@@ -55,6 +55,10 @@ private:
     }
 
 public:
+    struct Marker {
+        Chunk* chunk{nullptr};
+        size_t offset{0};
+    };
 
     Arena(const Arena&) = delete;
     Arena& operator=(const Arena&) = delete;
@@ -71,10 +75,17 @@ public:
     ) noexcept;
 
     // Allocate and nullify.
-    [[nodiscard]] void* allocZeroed(
-        size_t bytes,                                  // Size of the allocation.
-        size_t alignment = alignof(::std::max_align_t) // byte-alignment (default - `std::max_align_t`)
-    ) noexcept;
+    // [[nodiscard]] void* allocZeroed(
+    //     size_t bytes,                                  // Size of the allocation.
+    //     size_t alignment = alignof(::std::max_align_t) // byte-alignment (default - `std::max_align_t`)
+    // ) noexcept;
+
+    // returns Marker of current Arena
+    [[nodiscard]] Marker getMarker() const noexcept {
+        return Marker{ current, current ? current->offset : 0 };
+    }
+
+    void popToMarker(Marker marker) noexcept;
 
     // Clear all Arena with all its contents.
     void clear() noexcept;

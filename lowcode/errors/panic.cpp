@@ -45,4 +45,21 @@ namespace es {
     std::abort();
 }
 
+void raiseWarning(ErrorCode code, const char* message, const char* file, int line) {
+    int numcode;
+    switch (code) {
+        case ErrorCode::Success: numcode = 0; break;
+        case ErrorCode::OutOfMemory: numcode = 1; break;
+        case ErrorCode::DanglingPointerAccess: numcode = 2; break;
+        case ErrorCode::TypeNotRegistered: numcode = 3; break;
+        case ErrorCode::MailboxKeyNotFound: numcode = 4; break;
+        case ErrorCode::SafepointTimeout: numcode = 5; break;
+        case ErrorCode::ContainerContainsOther: numcode = 6; break;
+        default: numcode = -1; break;
+    }
+    // printing error
+    std::cerr << "[ElySquare][WARNING][CODE:" << numcode << "][" << file << ':' << line << "]: " << message << "\n";
+    return;
+}
+
 }

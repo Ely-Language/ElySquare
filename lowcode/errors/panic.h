@@ -20,6 +20,23 @@
 
 namespace es {
 
+// For u, my dear user ♥
+namespace raiseble {
+    [[noreturn]] inline void panic(
+        ErrorCode code,      // Error Code
+        const char* message, // Error Message
+        const char* file,    // Current source code file
+        int line             // Line number
+    ) { ::es::triggerPanic(code, message, file, line); }
+
+    inline void warning (
+        ErrorCode code,      // Error Code
+        const char* message, // Error Message
+        const char* file,    // Current source code file
+        int line             // Line number
+    ) { ::es::raiseWarning(code, message, file, line); }
+}
+
 // writting error message & dump to the console
 [[noreturn]] void triggerPanic(
     ErrorCode code,      // Error Code
@@ -28,6 +45,12 @@ namespace es {
     int line             // Line number
 );
 
+void raiseWarning(
+    ErrorCode code,      // Error Code
+    const char* message, // Error Message
+    const char* file,    // Current source code file
+    int line             // Line number
+);
 
 // TODO AFTER HANDLES
 // void registerPanicCallback(

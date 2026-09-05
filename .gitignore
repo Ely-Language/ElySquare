@@ -1,3 +1,6 @@
+.gigacode/
+.vscode/
+
 # Prerequisites
 *.d
 

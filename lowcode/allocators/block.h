@@ -28,8 +28,8 @@ private:
 public:
     BlockAllocator(const BlockAllocator&) = delete;
     BlockAllocator& operator=(const BlockAllocator&) = delete;
-    BlockAllocator(BlockAllocator&&) noexcept;
-    BlockAllocator& operator=(BlockAllocator&&) noexcept;
+    // BlockAllocator(BlockAllocator&&) noexcept;
+    // BlockAllocator& operator=(BlockAllocator&&) noexcept;
 
     BlockAllocator(size_t elemSize, size_t blocksCount, size_t align = alignof(::std::max_align_t));
 

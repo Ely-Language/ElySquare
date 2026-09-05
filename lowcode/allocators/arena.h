@@ -58,8 +58,8 @@ public:
 
     Arena(const Arena&) = delete;
     Arena& operator=(const Arena&) = delete;
-    Arena(Arena&&) noexcept;
-    Arena& operator=(Arena&&) noexcept;
+    // Arena(Arena&&) noexcept;
+    // Arena& operator=(Arena&&) noexcept;
 
     Arena(size_t defaultChunkSize = 1048576ULL);
     ~Arena();

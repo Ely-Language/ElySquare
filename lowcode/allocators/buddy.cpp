@@ -16,7 +16,7 @@ inline uint32_t BuddyAllocator::getBuddyOffset(uint32_t offset, uint8_t order) {
 }
 
 uint8_t BuddyAllocator::sizeToOrder(size_t size) {
-    size_t totalSize = size + sizeof(BlockHeader);
+    size_t totalSize = size;// + sizeof(BlockHeader);
     
     if (totalSize <= (1U << ::es::staff::MIN_ORDER)) {
         return staff::MIN_ORDER;
@@ -93,7 +93,7 @@ void BuddyAllocator::mergeBlock(uint32_t offset, uint8_t order) {
 
     uint32_t buddyOffset = getBuddyOffset(offset, order);
 
-    const bool IsBuddyInArena = buddyOffset < (1U << staff::MAX_ORDER);
+    const bool IsBuddyInArena = buddyOffset < (pages * ESL_PAGE_SIZE);
     
     if (IsBuddyInArena) {
         auto* buddy = offsetToPtr(buddyOffset);
@@ -131,7 +131,7 @@ BuddyAllocator::BuddyAllocator(size_t size) {
 
     base = static_cast<uint8_t*>(chunkptr);
 
-    for (uint8_t i = 0; i < staff::BIN_COUNT - 1; i++) {
+    for (uint8_t i = 0; i < staff::BIN_COUNT; i++) {
         bins[i] = staff::NULL_OFFSET;
     }
 

@@ -26,7 +26,7 @@ namespace staff {
 class BuddyAllocator {
 private:
     // Header of any memory block of it
-    struct alignas(2) BlockHeader {
+    struct alignas(::std::max_align_t) BlockHeader {
         uint8_t order : 7; // from 4 till 22
         uint8_t is_free : 1; // is this block free?
     }; // 1 byte

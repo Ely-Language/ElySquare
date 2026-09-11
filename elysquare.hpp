@@ -9,3 +9,5 @@
 // If you can launch ur project because of memory
 // just try to set this macro
 #define ESLM_BASE_MEMORY_CHUNK 16 * 1024 * 1024 * 1024
+
+#include "typing.hpp"

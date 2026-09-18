@@ -116,7 +116,7 @@ void BuddyAllocator::mergeBlock(uint32_t offset, uint8_t order) {
 
 // PUBLIC METHODS =====================================
 
-BuddyAllocator::BuddyAllocator(size_t size) {
+BuddyAllocator::BuddyAllocator(size_t size, bool GC) {
     pages = (size + ESL_PAGE_SIZE - 1) / ESL_PAGE_SIZE;
     if (pages == 0) pages = 1;
     void* chunkptr = ::es::ESPageManager.requestPageChunk(pages);
@@ -139,6 +139,8 @@ BuddyAllocator::BuddyAllocator(size_t size) {
 
     uint8_t startOrder = sizeToOrder((pages * ESL_PAGE_SIZE));
     pushFreeBlock(0, startOrder);
+
+    hasGCScanAccess = GC;
 }
 
 [[nodiscard]] void* BuddyAllocator::alloc(size_t size) noexcept {

@@ -41,6 +41,8 @@ private:
     uint32_t bins[::es::staff::BIN_COUNT]; // headers bins
     uint32_t activeBinsBitmap; // bitmap
 
+    bool hasGCScanAccess;
+
     uint32_t ptrToOffset(void* ptr); // returns allocator's offset of given ptr
     FreeBlockHeader* offsetToPtr(uint32_t offset); // returns ptr by given offset
     inline uint32_t getBuddyOffset(uint32_t offset, uint8_t order); // returns buddy's offset
@@ -60,9 +62,14 @@ public:
     // BuddyAllocator(BuddyAllocator&&) noexcept;
     // BuddyAllocator& operator=(BuddyAllocator&&) noexcept;
 
-    BuddyAllocator(size_t size);
+    BuddyAllocator(
+        size_t size, // size limits of this pool
+        bool GC = true // Can GC scan this pool?
+    );
 
     ~BuddyAllocator();
+
+    inline bool hasScanAccess() { return hasGCScanAccess; }
     
     // Allocates with fixed size
     [[nodiscard]] void* alloc(size_t size) noexcept;

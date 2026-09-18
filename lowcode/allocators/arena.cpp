@@ -18,11 +18,12 @@ inline void Arena::clearChunks() {
     }
 }
 
-Arena::Arena(size_t defaultChunkSize = 1048576ULL) {
+Arena::Arena(size_t defaultChunkSize, bool GC) {
     Chunk* chunk = new Chunk(defaultChunkSize);
     head = chunk;
     current = chunk;
     defaultSize = defaultChunkSize;
+    hasGCScanAccess = GC;
 }
 
 Arena::~Arena() {

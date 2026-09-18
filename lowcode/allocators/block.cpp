@@ -2,7 +2,7 @@
 
 namespace es {
 
-BlockAllocator::BlockAllocator(size_t elemSize, size_t blocksCount, size_t align) {
+BlockAllocator::BlockAllocator(size_t elemSize, size_t blocksCount, size_t align, bool GC) {
     size_t alignedSize = (elemSize + align - 1) & ~(align - 1);
     
     blockSize = (alignedSize < sizeof(FreeBlock)) ? sizeof(FreeBlock) : alignedSize;
@@ -38,6 +38,8 @@ BlockAllocator::BlockAllocator(size_t elemSize, size_t blocksCount, size_t align
     }
 
     current->next = nullptr;
+
+    hasGCScanAccess = GC;
 }
 
 BlockAllocator::~BlockAllocator() {

@@ -46,6 +46,8 @@ private:
     Chunk* current;
     size_t defaultSize;
 
+    bool hasGCScanAccess;
+
     inline void expandByNewChunk(size_t size);
 
     inline void clearChunks();
@@ -65,8 +67,13 @@ public:
     // Arena(Arena&&) noexcept;
     // Arena& operator=(Arena&&) noexcept;
 
-    Arena(size_t defaultChunkSize = 1048576ULL);
+    Arena(
+        size_t defaultChunkSize = 1048576ULL,
+        bool GC = true // Can GC scan this arena?
+    );
     ~Arena();
+
+    inline bool getScanAccess() { return hasGCScanAccess; }
 
     // Allocate memory in this arena.
     [[nodiscard]] void* alloc(

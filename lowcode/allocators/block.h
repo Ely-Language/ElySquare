@@ -25,15 +25,24 @@ private:
     size_t pagesCount;
     FreeBlock* freeList;
 
+    bool hasGCScanAccess;
+
 public:
     BlockAllocator(const BlockAllocator&) = delete;
     BlockAllocator& operator=(const BlockAllocator&) = delete;
     // BlockAllocator(BlockAllocator&&) noexcept;
     // BlockAllocator& operator=(BlockAllocator&&) noexcept;
 
-    BlockAllocator(size_t elemSize, size_t blocksCount, size_t align = alignof(::std::max_align_t));
+    BlockAllocator(
+        size_t elemSize, // Size of each block (elements) in bytes
+        size_t blocksCount, // Count of blocks (elements)
+        size_t align = alignof(::std::max_align_t), // alignment of allocator
+        bool GC = true // can GC scan this pool?
+    );
 
     ~BlockAllocator();
+
+    inline bool hasScanAccess() { return hasGCScanAccess; }
 
     [[nodiscard]] void* uncheckedAlloc() noexcept;
 

@@ -44,5 +44,16 @@ typedef double flt;
 
 // NULL ===========================================================================
 
+typedef void sentinel;
+
 // empty value
-typedef void null;
+typedef sentinel null;
+
+// undefined value
+typedef sentinel undefined;
+
+enum SentinelState {
+    null,
+    undefined
+};
+

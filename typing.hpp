@@ -52,7 +52,7 @@ typedef sentinel null;
 // undefined value
 typedef sentinel undefined;
 
-enum SentinelState {
+enum SentinelState : uint8_t {
     null,
     undefined
 };

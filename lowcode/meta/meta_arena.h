@@ -5,13 +5,17 @@ namespace ESLowcode {
 
 namespace stuff {
 
-static constexpr sizeT MIN_BLOCK_SIZE = sizeof(void*); 
 static constexpr sizeT ALIGN_QUANTUM = 16;
+static constexpr sizeT MIN_BLOCK_SIZE = ALIGN_QUANTUM; 
 static constexpr sizeT NUM_BUCKETS = 32;
 
-inline sizeT getBucketIndex(sizeT size) noexcept {
-    sizeT aligned = (size < MIN_BLOCK_SIZE) ? MIN_BLOCK_SIZE : size;
-    return (aligned + ALIGN_QUANTUM - 1) / ALIGN_QUANTUM - 1;
+inline sizeT alignSize(sizeT size) noexcept {
+    sizeT actual = (size < MIN_BLOCK_SIZE) ? MIN_BLOCK_SIZE : size;
+    return (actual + ALIGN_QUANTUM - 1) & ~(ALIGN_QUANTUM - 1);
+}
+
+inline sizeT getBucketIndex(sizeT alignedSize) noexcept {
+    return (alignedSize / ALIGN_QUANTUM) - 1;
 }
 
 }
@@ -31,11 +35,30 @@ public:
 
     [[nodiscard]] void* metalloc(sizeT size, sizeT alignment = alignof(::std::max_align_t)) noexcept;
 
-    void metarecycle() noexcept;
+    void metarecycle(void* ptr, sizeT size) noexcept;
 
     template<typename T>
-    [[nodiscard]] T* metallocof() noexcept {
-        return metalloc(sizeof(T), alignof(T));
+    [[nodiscard]] inline T* metallocof() noexcept {
+        return static_cast<T*>(metalloc(sizeof(T), alignof(T)));
+    }
+
+    template<typename T>
+    inline void metarecycleof(T* ptr) noexcept {
+        if (!ptr) {
+#ifdef DEBUG
+        ::es::raiseble::warning(
+            ::es::ErrorCode::DanglingPointerAccess,
+            "Invalid attempt to delete empty SPECIFIED ptr in thread meta arena (next warning is the same error)",
+            "ElySquare/lowcode/meta/meta_arena.cpp",
+            __LINE__ - 6
+        );
+#endif
+            return;
+        }
+        if constexpr (!::std::is_trivially_destructible_v<T>) {
+            ptr->~T();
+        }
+        metarecycle(static_cast<void*>(ptr), sizeof(T));
     }
 
 };

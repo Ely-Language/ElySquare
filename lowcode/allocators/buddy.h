@@ -14,7 +14,7 @@
 
 namespace es {
 
-namespace staff {
+namespace stuff {
     constexpr uint8_t MIN_ORDER = 4; // 16 B (2^4)
     constexpr uint8_t MAX_ORDER = 22; // 4 MB (2^22)
     constexpr uint8_t BIN_COUNT = MAX_ORDER - MIN_ORDER + 1;
@@ -38,7 +38,7 @@ private:
 
     void* base; // start address
     size_t pages; // size of it in pages
-    uint32_t bins[::es::staff::BIN_COUNT]; // headers bins
+    uint32_t bins[::es::stuff::BIN_COUNT]; // headers bins
     uint32_t activeBinsBitmap; // bitmap
 
     bool hasGCScanAccess;

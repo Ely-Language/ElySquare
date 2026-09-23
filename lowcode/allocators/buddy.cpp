@@ -18,17 +18,17 @@ inline uint32_t BuddyAllocator::getBuddyOffset(uint32_t offset, uint8_t order) {
 uint8_t BuddyAllocator::sizeToOrder(size_t size) {
     size_t totalSize = size;// + sizeof(BlockHeader);
     
-    if (totalSize <= (1U << ::es::staff::MIN_ORDER)) {
-        return staff::MIN_ORDER;
+    if (totalSize <= (1U << ::es::stuff::MIN_ORDER)) {
+        return stuff::MIN_ORDER;
     }
 
     uint8_t order = static_cast<uint8_t>(::std::bit_width(totalSize - 1));
 
-    return ::std::min(order, staff::MAX_ORDER);
+    return ::std::min(order, stuff::MAX_ORDER);
 }
 
 constexpr inline size_t BuddyAllocator::getIndexByOrder(uint8_t order) {
-    return order - staff::MIN_ORDER;
+    return order - stuff::MIN_ORDER;
 }
 
 void BuddyAllocator::pushFreeBlock(uint32_t offset, uint8_t order) {
@@ -38,11 +38,11 @@ void BuddyAllocator::pushFreeBlock(uint32_t offset, uint8_t order) {
     
     // freedom for this block!
     block->is_free = true;
-    block->prev_offset = staff::NULL_OFFSET;
+    block->prev_offset = stuff::NULL_OFFSET;
     block->next_offset = oldHeadOffset;
     block->order = order;
 
-    if (oldHeadOffset != staff::NULL_OFFSET) [[likely]] {
+    if (oldHeadOffset != stuff::NULL_OFFSET) [[likely]] {
         FreeBlockHeader* oldHead = offsetToPtr(oldHeadOffset);
         oldHead->prev_offset = offset;
     }
@@ -57,19 +57,19 @@ void BuddyAllocator::pushFreeBlock(uint32_t offset, uint8_t order) {
 void BuddyAllocator::removeFreeBlock(uint32_t offset, uint8_t order) {
     FreeBlockHeader* block = offsetToPtr(offset);
     
-    if (block->prev_offset != staff::NULL_OFFSET) [[likely]] {
+    if (block->prev_offset != stuff::NULL_OFFSET) [[likely]] {
         FreeBlockHeader* prev = offsetToPtr(block->prev_offset);
         prev->next_offset = block->next_offset;
     } else {
         const size_t idx = getIndexByOrder(order);
         bins[idx] = block->next_offset;
 
-        if (bins[idx] == staff::NULL_OFFSET) [[unlikely]] {
+        if (bins[idx] == stuff::NULL_OFFSET) [[unlikely]] {
             activeBinsBitmap &= ~(1U << idx);
         }
     }
 
-    if (block->next_offset != staff::NULL_OFFSET) [[likely]] {
+    if (block->next_offset != stuff::NULL_OFFSET) [[likely]] {
         FreeBlockHeader* next = offsetToPtr(block->next_offset);
         next->prev_offset = block->prev_offset;
     }
@@ -89,7 +89,7 @@ uint32_t BuddyAllocator::splitBlock(uint32_t offset, uint8_t initialOrder, uint8
 }
 
 void BuddyAllocator::mergeBlock(uint32_t offset, uint8_t order) {
-    if (order >= staff::MAX_ORDER) { pushFreeBlock(offset, order); return; }
+    if (order >= stuff::MAX_ORDER) { pushFreeBlock(offset, order); return; }
 
     uint32_t buddyOffset = getBuddyOffset(offset, order);
 
@@ -131,8 +131,8 @@ BuddyAllocator::BuddyAllocator(size_t size, bool GC) {
 
     base = static_cast<uint8_t*>(chunkptr);
 
-    for (uint8_t i = 0; i < staff::BIN_COUNT; i++) {
-        bins[i] = staff::NULL_OFFSET;
+    for (uint8_t i = 0; i < stuff::BIN_COUNT; i++) {
+        bins[i] = stuff::NULL_OFFSET;
     }
 
     activeBinsBitmap = 0;
@@ -144,7 +144,7 @@ BuddyAllocator::BuddyAllocator(size_t size, bool GC) {
 }
 
 [[nodiscard]] void* BuddyAllocator::alloc(size_t size) noexcept {
-    bool weCantPutIt = size + sizeof(BlockHeader) > (1U << staff::MAX_ORDER);
+    bool weCantPutIt = size + sizeof(BlockHeader) > (1U << stuff::MAX_ORDER);
     if (size == 0 || weCantPutIt) return nullptr;
     
     uint8_t targetOrder = sizeToOrder(size);
@@ -156,7 +156,7 @@ BuddyAllocator::BuddyAllocator(size_t size, bool GC) {
     if (mask == 0) return nullptr;
 
     uint32_t foundIdx = ::std::countr_zero(mask);
-    uint32_t foundOrder = foundIdx + staff::MIN_ORDER;
+    uint32_t foundOrder = foundIdx + stuff::MIN_ORDER;
 
     // allocating
     uint32_t offset = bins[foundIdx];

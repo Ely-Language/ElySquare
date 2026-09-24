@@ -1,3 +1,5 @@
+#pragma once
+
 #include "lowcode/allocators/arena.h"
 #include "typing.hpp"
 

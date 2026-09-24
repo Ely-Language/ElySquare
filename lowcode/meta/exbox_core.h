@@ -130,11 +130,11 @@ inline void unboxSSOString(taggedValue rawValue, char* outBuffer) {
     outBuffer[length] = '\0';
 }
 
-inline taggedValue boxAtom(uint32_t stringHash) {
+inline taggedValue boxAtom(atom stringHash) {
     return (static_cast<taggedValue>(stringHash) << 3) | TAG_SYMBOL;
 }
 
-inline uint32_t unboxAtom(taggedValue rawValue) {
+inline atom unboxAtom(taggedValue rawValue) {
     return static_cast<uint32_t>(rawValue >> 3);
 }
 

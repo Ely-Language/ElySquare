@@ -42,6 +42,8 @@ typedef double flt;
 
 // TODO while base level
 
+typedef uint32_t atom;
+
 // NULL ===========================================================================
 
 typedef void sentinel;

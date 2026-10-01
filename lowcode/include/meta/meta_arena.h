@@ -1,7 +1,7 @@
 #pragma once
 
-#include "lowcode/allocators/arena.h"
-#include "typing.hpp"
+#include "include/allocators/arena.h"
+#include "backend/include/typing/typing.hpp"
 
 namespace ESLowcode {
 

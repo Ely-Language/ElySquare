@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "exbox_core.h"
-#include "meta_arena.h"
+#include "include/meta/exbox_core.h"
+#include "include/meta/meta_arena.h"
 
 namespace ESLowcode {
 

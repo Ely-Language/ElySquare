@@ -1,5 +1,6 @@
 .gigacode/
 .vscode/
+tests/
 
 # Prerequisites
 *.d

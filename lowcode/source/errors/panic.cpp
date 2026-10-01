@@ -1,4 +1,4 @@
-#include "panic.h"
+#include "include/errors/panic.h"
 
 constexpr int MAX_FRAMES = 64;
 

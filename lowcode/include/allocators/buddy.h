@@ -8,9 +8,9 @@
 #include <memory>
 #include <string_view>
 #include <bit>
-#include "allocators/page_mgr.h"
-#include "errors/panic.h"
-#include "errors/error_codes.h"
+#include "include/allocators/page_mgr.h"
+#include "include/errors/panic.h"
+#include "include/errors/error_codes.h"
 
 namespace es {
 

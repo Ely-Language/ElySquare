@@ -8,11 +8,11 @@
 #include <iostream>
 #include <bit>
 
-#include "platform/atomics.h"
-#include "platform/os_mem.h"
+#include "include/platform/atomics.h"
+#include "include/platform/os_mem.h"
 
-#include "errors/error_codes.h"
-#include "errors/panic.h"
+#include "include/errors/error_codes.h"
+#include "include/errors/panic.h"
 
 PagePermissions DEFAULT_PAGE_PERMISSION = PagePermissions::ReadWriteExecute;
 

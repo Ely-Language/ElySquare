@@ -1,7 +1,7 @@
 #pragma once
 #include <utility>
 #include <memory>
-#include "buddy.h"
+#include "include/allocators/buddy.h"
 
 #ifndef ESL_THREAD_SIZE
 #define ESL_THREAD_SIZE 4 * 1024 * 1024 // 4 MB

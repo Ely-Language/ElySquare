@@ -60,3 +60,5 @@ enum SentinelState : uint8_t {
     undefined
 };
 
+#define invalidIndex UINT16_MAX
+

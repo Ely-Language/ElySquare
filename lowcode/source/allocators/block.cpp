@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "include/allocators/block.h"
 
 namespace es {

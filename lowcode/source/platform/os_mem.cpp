@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "include/platform/os_mem.h"
 
 namespace ESLowcode {

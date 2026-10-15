@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "include/errors/panic.h"
 
 constexpr int MAX_FRAMES = 64;

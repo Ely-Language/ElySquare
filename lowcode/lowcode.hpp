@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // ElySquare Low-level OS part
 // ===========================
 #pragma once

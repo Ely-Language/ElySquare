@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // OS memory management | Взаимодействие с памятью ОС
 // ==================================================
 #pragma once

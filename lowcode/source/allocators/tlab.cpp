@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "include/allocators/tlab.h"
 
 namespace es {

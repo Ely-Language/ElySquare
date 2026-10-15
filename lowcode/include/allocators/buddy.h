@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Buddy allocator
 #pragma once
 

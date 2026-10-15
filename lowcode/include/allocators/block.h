@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Block (Pool) allocator
 #pragma once
 

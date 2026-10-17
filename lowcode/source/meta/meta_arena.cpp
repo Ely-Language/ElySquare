@@ -30,6 +30,7 @@ void* MetaArena::metalloc(sizeT size, sizeT alignment) noexcept {
     sizeT actualSize = stuff::alignSize(size);
     sizeT bucketIdx = stuff::getBucketIndex(actualSize);
 
+    
     // Cached (FreeLists)
     if (bucketIdx < stuff::NUM_BUCKETS && freeListHead[bucketIdx] != nullptr) {
         FreeList* node = freeListHead[bucketIdx];
@@ -37,7 +38,8 @@ void* MetaArena::metalloc(sizeT size, sizeT alignment) noexcept {
         return static_cast<void*>(node);
     }
 
-    return arena->alloc(actualSize, alignment);
+    void* node = arena->alloc(actualSize, alignment);
+    return node;
 }
 
 void MetaArena::metarecycle(void* ptr, sizeT size) noexcept {

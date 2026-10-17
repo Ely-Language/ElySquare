@@ -5,6 +5,8 @@
 #include "include/allocators/arena.h"
 #include "backend/include/typing/typing.hpp"
 
+#include "include/meta/shape_map.h"
+
 namespace ESLowcode {
 
 namespace stuff {
@@ -24,6 +26,7 @@ inline sizeT getBucketIndex(sizeT alignedSize) noexcept {
 
 }
 
+
 class MetaArena {
 private:
     struct FreeList {
@@ -31,6 +34,8 @@ private:
     };
 
     ::es::Arena* arena;
+
+    Shape* lastAllocatedShape;
     
     FreeList* freeListHead[stuff::NUM_BUCKETS];
 public:
@@ -40,6 +45,14 @@ public:
     [[nodiscard]] void* metalloc(sizeT size, sizeT alignment = alignof(::std::max_align_t)) noexcept;
 
     void metarecycle(void* ptr, sizeT size) noexcept;
+
+    inline void setLastAllocatedShape(Shape* last) {
+        this->lastAllocatedShape = last;
+    }
+
+    inline Shape* getLastAllocatedShape() {
+        return this->lastAllocatedShape;
+    }
 
     template<typename T>
     [[nodiscard]] inline T* metallocof() noexcept {

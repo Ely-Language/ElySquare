@@ -27,6 +27,7 @@ const uint16_t IS_FROZEN = 0x04;         // ...0100 = 4
 const uint16_t IS_HASH_TABLE_MODE = 0x08;// ...1000 = 8
 }
 
+
 inline sizeT getNextTransitionCapacity(sizeT currentCapacity) {
     if (currentCapacity == 0) [[unlikely]] return 2;
 
@@ -44,8 +45,6 @@ struct PropertyDescriptor {
     uint16_t attributes;  // readonly, hidden, isGetter, isSetter
 }; // 64 bit (8 bytes)
 
-struct Shape;
-
 // Transition
 struct TransitionEntry {
     Shape* targetShape; // ptr of shape object will become
@@ -56,17 +55,24 @@ struct TransitionEntry {
 struct Shape {
     Shape* parentShape;                 // ptr to parent shape
     MetaArena* arena;                   // Arena of it
-
+    
+    Shape* nextShapeInArena;
+    Shape* prevShapeInArena;            // GC - next and prev in meta arena
+    
     uint16_t shapeFlags;
     
     uint16_t propertyCount;             // count of properties
     PropertyDescriptor* propArray;      // ptr to descriptor array
-
+    
     uint16_t transitionCount;
     uint16_t transitionCapacity;
-    TransitionEntry** transitionTable;   // transitions array (table)
+    TransitionEntry* transitionTable;   // transitions array (table)
+    
+}; // 64 bytes
 
-}; // 40 bytes
+static_assert(sizeof(Shape) == 64, "Shape layout changed");
+static_assert(sizeof(TransitionEntry) == 16, "TransitionEntry layout changed");
+static_assert(sizeof(PropertyDescriptor) == 8, "PropertyDescriptor layout changed");
 
 // Creates root Shape for type with zero properties
 Shape* createRootShape(MetaArena* arena);
@@ -74,7 +80,7 @@ Shape* createRootShape(MetaArena* arena);
 // Returns flags for shape from atom's flags
 inline uint16_t getShapeFlags(Shape* parent, uint16_t atomFlags) {
     if (!parent) [[unlikely]] return 0U;
-
+    
     uint16_t shapeFlags = 0U;
     if (
         (atomFlags & stuff::accessFlags::IS_GETTER) != 0 || 
@@ -88,7 +94,13 @@ inline uint16_t getShapeFlags(Shape* parent, uint16_t atomFlags) {
 }
 
 // Returns transition with atom to specified Shape
-TransitionEntry* transiteTo(Shape* shapeTo, atom propertyAtom);
+inline TransitionEntry transiteTo(Shape* shapeTo, atom propertyAtom) {
+    TransitionEntry transition = TransitionEntry();
+    transition.propertyAtom = propertyAtom;
+    transition.targetShape = shapeTo;
+
+    return transition;
+}
 
 // Creates new Shape from parent Shape
 Shape* makeShape(Shape* parent, uint16_t atomFlags);
@@ -125,16 +137,9 @@ Shape* transitionShape(
     bool isSetter = false
 );
 
-// Finds the array offset idx for a given property atom within the Shape layaot
-inline uint16_t findPropertyOffset(Shape* shape, atom propertyAtom) {
-    PropertyDescriptor* property = getProperty(shape, propertyAtom);
-    if (property) {
-        return property->offsetIndex;
-    } else return invalidIndex;
-}
-
 // Returns descriptor of property
 inline PropertyDescriptor* getProperty(Shape* shape, atom propertyAtom) {
+    if (!shape || shape->propertyCount == 0) [[unlikely]] return nullptr;
     for (sizeT i = 0; i < shape->propertyCount; i++) {
         if (shape->propArray[i].nameAtom == propertyAtom) {
             return &shape->propArray[i];
@@ -145,13 +150,30 @@ inline PropertyDescriptor* getProperty(Shape* shape, atom propertyAtom) {
 
 // Checks if this property exists in current Shape `shape`
 inline bool hasProperty(Shape* shape, atom propertyAtom) {
+    if (!shape) return false;
     return getProperty(shape, propertyAtom) != nullptr;
 }
 
+// Finds the array offset idx for a given property atom within the Shape layaot
+inline uint16_t findPropertyOffset(Shape* shape, atom propertyAtom) {
+    PropertyDescriptor* property = getProperty(shape, propertyAtom);
+    if (property) {
+        return property->offsetIndex;
+    } else return invalidIndex;
+}
+
 // Marks the Shape `shape` as active during GC Mark phase
-void markShapeAlive(Shape* shape) {
+// NOT RECURSIVE! just marks THIS shape
+inline void markShapeAlive(Shape* shape) {
+    if (shape == nullptr) [[unlikely]] return;
     shape->shapeFlags |= stuff::shapeFlags::IS_MARKED_ALIVE;
 }
+
+// Kills the shape
+void killShape(Shape* shape);
+
+// Making shape's neighbors not addictive to it
+void forgetShape(Shape* shape);
 
 // Cleans unused graph branches
 sizeT sweepOrphanedShapes(MetaArena* metaArena);
@@ -159,5 +181,10 @@ sizeT sweepOrphanedShapes(MetaArena* metaArena);
 
 
 // SHAPES ATTRIBUTES
-
+inline bool isShapeAlive(Shape* shape) {
+    if (!shape) return false;
+    return (
+        (shape->shapeFlags & stuff::shapeFlags::IS_MARKED_ALIVE) != 0
+    );
+}
 }

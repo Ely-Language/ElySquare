@@ -23,6 +23,9 @@ Shape* createRootShape(MetaArena* arena) {
     shape->parentShape = nullptr;
     shape->arena = arena;
 
+    shape->nextShapeInArena = nullptr;
+    shape->prevShapeInArena = nullptr;
+
     shape->propertyCount = 0;
     shape->propArray = nullptr;
 
@@ -32,27 +35,9 @@ Shape* createRootShape(MetaArena* arena) {
 
     shape->shapeFlags = 0x01;
 
+    shape->arena->setLastAllocatedShape(shape);
+
     return shape;
-}
-
-TransitionEntry* transiteTo(Shape* shapeTo, atom propertyAtom) {
-    void* ptr = shapeTo->arena->metalloc(
-        sizeof(TransitionEntry),
-        alignof(TransitionEntry)
-    );
-
-    if (!ptr) [[unlikely]] ::es::raiseble::panic(
-        ::es::ErrorCode::OutOfMemory,
-        "Failed to get memory for Shape transition",
-        __FILE__,
-        __LINE__ - 9
-    );
-
-    TransitionEntry* transition = new (ptr) TransitionEntry();
-    transition->propertyAtom = propertyAtom;
-    transition->targetShape = shapeTo;
-
-    return transition;
 }
 
 Shape* makeShape(Shape* parent, uint16_t atomFlags) {
@@ -73,37 +58,48 @@ Shape* makeShape(Shape* parent, uint16_t atomFlags) {
     child->parentShape = parent;
     child->arena = parent->arena;
 
+    Shape* last = child->arena->getLastAllocatedShape();
+    if (!last) [[unlikely]] ::es::raiseble::panic(
+        ::es::ErrorCode::InternalError,
+        "makeShape called before createRootShape",
+        __FILE__, __LINE__ - 4
+    );
+    last->nextShapeInArena = child;
+    child->prevShapeInArena = last;
+    
     child->shapeFlags = getShapeFlags(parent, atomFlags);
-
+    
     child->transitionCount = 0;
     child->transitionCapacity = 0;
     child->transitionTable = nullptr;
-
+    
     // Creation of properties
     child->propertyCount = parent->propertyCount + 1;
-
+    
     void* propArrayPtr = child->arena->metalloc(
-        sizeof(PropertyDescriptor[child->propertyCount]),
-        alignof(PropertyDescriptor[child->propertyCount])
+        sizeof(PropertyDescriptor) * child->propertyCount,
+        alignof(PropertyDescriptor)
     );
-
+    
     if (!propArrayPtr) [[unlikely]] ::es::raiseble::panic(
         ::es::ErrorCode::OutOfMemory,
         "Failed to get memory for new Shape properties",
         __FILE__,
         __LINE__ - 9
     );
-
-    PropertyDescriptor* propDescArr = new (propArrayPtr) PropertyDescriptor[child->propertyCount];
-
+    
+    PropertyDescriptor* propDescArr = new (propArrayPtr) PropertyDescriptor[child->propertyCount]();
+    
     // copying properties
     if (parent->propertyCount) {
         for (uint16_t i = 0; i < parent->propertyCount; i++) {
             propDescArr[i] = parent->propArray[i];
         }
     }
-
+    
     child->propArray = propDescArr;
+
+    child->arena->setLastAllocatedShape(child);
     
     return child;
 }
@@ -161,8 +157,8 @@ Shape* createTransition(
         if (currentShape->transitionCount == 0) {
             const sizeT newCapacity = 2;
             void* ptr = currentShape->arena->metalloc(
-                sizeof(TransitionEntry*[newCapacity]), 
-                alignof(TransitionEntry*[newCapacity])
+                sizeof(TransitionEntry) * newCapacity, 
+                alignof(TransitionEntry)
             );
 
             if (!ptr) [[unlikely]] ::es::raiseble::panic(
@@ -172,19 +168,27 @@ Shape* createTransition(
                 __LINE__ - 9
             );
 
-            TransitionEntry** newTransitionTable = new (ptr) TransitionEntry*[newCapacity]; 
+            TransitionEntry* newTransitionTable = new (ptr) TransitionEntry[newCapacity](); 
             currentShape->transitionTable = newTransitionTable;
 
-            currentShape->transitionTable[0] = nullptr;
-            currentShape->transitionTable[1] = nullptr;
+            // currentShape->transitionTable[0];
+            // currentShape->transitionTable[1];
             
             currentShape->transitionCapacity = newCapacity;
             // transitionIdx = 0; // already
         } else { // if transition count is more than zero
             sizeT newCapacity = stuff::getNextTransitionCapacity(currentShape->transitionCapacity);
+
+            if (newCapacity > UINT16_MAX) [[unlikely]]
+            ::es::raiseble::panic(
+                ::es::ErrorCode::OutOfMemory,
+                "Shape transition table too large (> UINT16_MAX entries)",
+                __FILE__, __LINE__
+            );
+
             void* ptr = currentShape->arena->metalloc(
-                sizeof(TransitionEntry*[newCapacity]),
-                alignof(TransitionEntry*[newCapacity])
+                sizeof(TransitionEntry) * newCapacity,
+                alignof(TransitionEntry)
             );
 
             if (!ptr) [[unlikely]] ::es::raiseble::panic(
@@ -194,21 +198,25 @@ Shape* createTransition(
                 __LINE__ - 9
             );
 
-            TransitionEntry** newTransitionTable = new (ptr) TransitionEntry*[newCapacity];
+            TransitionEntry* newTransitionTable = new (ptr) TransitionEntry[newCapacity]();
             // Copying values
             for (sizeT i = 0; i < currentShape->transitionCount; i++) {
                 newTransitionTable[i] = currentShape->transitionTable[i];
             }
-            for (sizeT i = currentShape->transitionCount; i < newCapacity; i++) {
-                newTransitionTable[i] = nullptr;
-            }
-            TransitionEntry** oldTransitionTable = currentShape->transitionTable;
+            TransitionEntry* oldTransitionTable = currentShape->transitionTable;
 
             currentShape->transitionTable = newTransitionTable;
-            currentShape->arena->metarecycle(oldTransitionTable, sizeof(TransitionEntry*) * currentShape->transitionCapacity);
+            currentShape->arena->metarecycle(oldTransitionTable, sizeof(TransitionEntry) * currentShape->transitionCapacity);
 
-            currentShape->transitionCapacity = newCapacity;
-            transitionIdx = currentShape->transitionCount - 1;
+            if (currentShape->transitionCount == UINT16_MAX) [[unlikely]]
+            ::es::raiseble::panic(
+                ::es::ErrorCode::OutOfMemory,
+                "Shape transition table is too large (> UINT16_MAX entries)",
+                __FILE__, 
+                __LINE__ - 4
+            );
+
+            currentShape->transitionCapacity = static_cast<uint16_t>(newCapacity);
         }
     } else { // if we have some space
         transitionIdx = currentShape->transitionCount;
@@ -226,11 +234,19 @@ Shape* createTransition(
         isSetter
     );
     
-    Shape* child = makeShape(currentShape, property.attributes);
+    if (currentShape->propertyCount == UINT16_MAX) [[unlikely]] 
+    ::es::raiseble::panic(
+        ::es::ErrorCode::OutOfMemory,
+        "Shape properties count is too big",
+        __FILE__,
+        __LINE__ - 4
+    );
     
+    Shape* child = makeShape(currentShape, property.attributes);
+
     child->propArray[child->propertyCount - 1] = property;
 
-    TransitionEntry* transition = transiteTo(child, propertyAtom);
+    TransitionEntry transition = transiteTo(child, propertyAtom);
 
     currentShape->transitionTable[transitionIdx] = transition;
     currentShape->transitionCount++;
@@ -256,16 +272,17 @@ Shape* transitionShape(
     if (isGetter) attributes |= stuff::accessFlags::IS_GETTER;
     if (isSetter) attributes |= stuff::accessFlags::IS_SETTER;
 
-    if (currentShape->transitionTable != nullptr) [[likely]] {
+    if (currentShape->transitionTable != nullptr) {
         // Has we shape with same transition?
         for (uint16_t i = 0; i < currentShape->transitionCount; i++) {
-            TransitionEntry* transition = currentShape->transitionTable[i];
+            const TransitionEntry &transition = currentShape->transitionTable[i];
+            if (!transition.targetShape) [[unlikely]] continue;
             if (
-                transition->propertyAtom == propertyAtom &&
-                transition->targetShape->propArray[transition->targetShape->propertyCount - 1]
+                transition.propertyAtom == propertyAtom &&
+                transition.targetShape->propArray[transition.targetShape->propertyCount - 1]
                 .attributes == attributes
             ) 
-                return transition->targetShape;
+                return transition.targetShape;
         }
     }
 
@@ -280,8 +297,96 @@ Shape* transitionShape(
     );
 }
 
-sizeT sweepOrphanedShapes(MetaArena* metaArena) {
+void killShape(Shape* shape) {
+    if (shape == nullptr) [[unlikely]] return;
 
+    if (shape->propertyCount != 0) {
+        shape->arena->metarecycle(
+            shape->propArray,
+            sizeof(PropertyDescriptor) * shape->propertyCount
+        );
+    }
+    if (shape->transitionCapacity != 0) {
+        shape->arena->metarecycle(
+            shape->transitionTable,
+            sizeof(TransitionEntry) * shape->transitionCapacity
+        );
+    }
+    shape->arena->metarecycle(
+        shape,
+        sizeof(Shape)
+    );
+}
+
+void forgetShape(Shape* shape) {
+    if (shape == nullptr) [[unlikely]] return; // means you're idiot
+
+    if (shape->prevShapeInArena == nullptr && shape->parentShape == nullptr) {
+        return;
+    } // root shape
+
+    if (shape->prevShapeInArena == nullptr) [[unlikely]] { // NOOOOOO! 
+        ::es::raiseble::panic(
+            ::es::ErrorCode::InternalError,
+            "Non-root shape with null prevShapeInArena (corrupted list)",
+            __FILE__, 
+            __LINE__ - 5
+        );
+    }
+
+    if (shape == shape->arena->getLastAllocatedShape()) [[unlikely]] {
+            shape->arena->setLastAllocatedShape(shape->prevShapeInArena);
+        }
+
+    // arena links
+    if (shape->nextShapeInArena != nullptr) {
+        shape->nextShapeInArena->prevShapeInArena = shape->prevShapeInArena;
+    }
+    shape->prevShapeInArena->nextShapeInArena = shape->nextShapeInArena;
+
+    // parentship links
+    const uint16_t count = shape->parentShape->transitionCount;
+    for (uint16_t i = 0; i < count; ++i) {
+        if (shape->parentShape->transitionTable[i].targetShape == shape) {
+            shape->parentShape->transitionTable[i] = shape->parentShape->transitionTable[count - 1];
+            shape->parentShape->transitionCount = count - 1;
+            return;
+        }
+    }
+
+    ::es::raiseble::panic(
+        ::es::ErrorCode::InternalError,
+        "Failed to find parent-current transition",
+        __FILE__,
+        __LINE__ - 12
+    );
+}
+
+sizeT sweepOrphanedShapes(MetaArena* metaArena) {
+    // 1) get start shape
+    Shape* last = metaArena->getLastAllocatedShape();
+    if (!last) [[unlikely]] return 0;
+
+    // 2) to-head cycle
+    sizeT killed = 0;
+    Shape* current = last;
+    while (current->prevShapeInArena != nullptr) {
+        Shape* prev = current->prevShapeInArena;
+
+        // if it's dead
+        if (!isShapeAlive(current)) {
+            // deleting it
+            forgetShape(current);
+            killShape(current);
+            killed++;
+        } else {
+            current->shapeFlags &= ~(stuff::shapeFlags::IS_MARKED_ALIVE);
+        }
+
+        current = prev;
+    }
+
+    return killed;
 }
 
 }

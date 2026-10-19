@@ -181,10 +181,127 @@ sizeT sweepOrphanedShapes(MetaArena* metaArena);
 
 
 // SHAPES ATTRIBUTES
+
+// is given shape alive? 
 inline bool isShapeAlive(Shape* shape) {
     if (!shape) return false;
     return (
         (shape->shapeFlags & stuff::shapeFlags::IS_MARKED_ALIVE) != 0
     );
 }
+
+// is it root shape?
+inline bool isRootShape(Shape* shape) {
+    return shape && shape->parentShape == nullptr;
+}
+
+// has it accessors?
+inline bool hasShapeAccessors(Shape* shape) {
+    return shape && (shape->shapeFlags & stuff::shapeFlags::HAS_ACCESSORS) != 0;
+}
+
+// is it frozen
+inline bool isShapeFrozen(Shape* shape) {
+    return shape && (shape->shapeFlags & stuff::shapeFlags::IS_FROZEN) != 0;
+}
+
+// makin' it frozen/cooked
+inline void setShapeFrozen(Shape* shape, bool isFrozen = true) {
+    if (isFrozen) {
+        shape->shapeFlags |= stuff::shapeFlags::IS_FROZEN;
+    } else {
+        shape->shapeFlags &= ~stuff::shapeFlags::IS_FROZEN;
+    }
+}
+
+// is it in hash table mode
+inline bool isShapeHashTableMode(Shape* shape) {
+    return shape && (shape->shapeFlags & stuff::shapeFlags::IS_HASH_TABLE_MODE) != 0;
+}
+
+// sets hashTable mode
+inline void setShapeHashTableMode(Shape* shape, bool isHashTableMode = true) {
+    if (isHashTableMode) {
+        shape->shapeFlags |= stuff::shapeFlags::IS_HASH_TABLE_MODE;
+    } else {
+        shape->shapeFlags &= ~stuff::shapeFlags::IS_HASH_TABLE_MODE;
+    }
+}
+
+// PropertyDescriptor
+
+// Is property readonly
+inline bool isPropertyReadonly(const PropertyDescriptor* prop) {
+    return prop && (prop->attributes & stuff::accessFlags::READONLY) != 0;
+}
+// Is property hidden
+inline bool isPropertyHidden(const PropertyDescriptor* prop) {
+    return prop && (prop->attributes & stuff::accessFlags::HIDDEN) != 0;
+}
+// Is property getter
+inline bool isPropertyGetter(const PropertyDescriptor* prop) {
+    return prop && (prop->attributes & stuff::accessFlags::IS_GETTER) != 0;
+}
+// Is property setter 
+inline bool isPropertySetter(const PropertyDescriptor* prop) {
+    return prop && (prop->attributes & stuff::accessFlags::IS_SETTER) != 0;
+}
+
+// returns property at index of `index`
+inline PropertyDescriptor* getPropertyAt(Shape* shape, uint16_t index) {
+    if (!shape || index >= shape->propertyCount) return nullptr;
+    return &shape->propArray[index];
+}
+
+// returns transition at `index`
+inline TransitionEntry* getTransitionAt(Shape* shape, uint16_t index) {
+    if (!shape || index >= shape->transitionCount) return nullptr;
+    return &shape->transitionTable[index];
+}
+
+// returns last property
+inline PropertyDescriptor* getLastProperty(Shape* shape) {
+    if (!shape || shape->propertyCount == 0) return nullptr;
+    return &shape->propArray[shape->propertyCount - 1];
+}
+
+// Returns the Shape's transition of given atom
+inline TransitionEntry* findTransition(
+    Shape* shape, 
+    atom propertyAtom, 
+    uint16_t attributes
+) {
+    if (!shape || !shape->transitionTable) return nullptr;
+
+    for (uint16_t i = 0; i < shape->transitionCount; i++) {
+        TransitionEntry* transition = &shape->transitionTable[i];
+        if (!transition->targetShape || transition->propertyAtom != propertyAtom) continue;
+
+        PropertyDescriptor* lastProp = getLastProperty(transition->targetShape);
+        if (lastProp && lastProp->attributes == attributes) return transition;
+    }
+    return nullptr;
+}
+
+// Checks has this Shape transition of given atom
+inline bool hasTransitionOn(Shape* shape, atom propertyAtom) {
+    if (!shape || !shape->transitionTable) return false;
+
+    for (uint16_t i = 0; i < shape->transitionCount; i++) {
+        if (shape->transitionTable[i].propertyAtom == propertyAtom) return true;
+    }
+
+    return false;
+}
+
+// returns shapes tree depth of `shape`
+inline uint16_t getShapeChainDepth(Shape* shape) {
+    uint16_t depth = 0;
+    while (shape && shape->parentShape) { 
+        shape = shape->parentShape; 
+        depth++; 
+    }
+    return depth;
+}
+
 }

@@ -274,16 +274,8 @@ Shape* transitionShape(
 
     if (currentShape->transitionTable != nullptr) {
         // Has we shape with same transition?
-        for (uint16_t i = 0; i < currentShape->transitionCount; i++) {
-            const TransitionEntry &transition = currentShape->transitionTable[i];
-            if (!transition.targetShape) [[unlikely]] continue;
-            if (
-                transition.propertyAtom == propertyAtom &&
-                transition.targetShape->propArray[transition.targetShape->propertyCount - 1]
-                .attributes == attributes
-            ) 
-                return transition.targetShape;
-        }
+        TransitionEntry* transition = findTransition(currentShape, propertyAtom, attributes);
+        if (transition != nullptr) return transition->targetShape;
     }
 
     return createTransition(

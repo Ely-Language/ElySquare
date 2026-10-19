@@ -17,6 +17,8 @@ namespace es {
         case ErrorCode::MailboxKeyNotFound: numcode = 4; break;
         case ErrorCode::SafepointTimeout: numcode = 5; break;
         case ErrorCode::ContainerContainsOther: numcode = 6; break;
+        case ErrorCode::InternalError: numcode = 7; break;
+        case ErrorCode::RuntimeError: numcode = 8; break;
         default: numcode = -1; break;
     }
     // printing error
@@ -57,6 +59,8 @@ void raiseWarning(ErrorCode code, const char* message, const char* file, int lin
         case ErrorCode::MailboxKeyNotFound: numcode = 4; break;
         case ErrorCode::SafepointTimeout: numcode = 5; break;
         case ErrorCode::ContainerContainsOther: numcode = 6; break;
+        case ErrorCode::InternalError: numcode = 7; break;
+        case ErrorCode::RuntimeError: numcode = 8; break;
         default: numcode = -1; break;
     }
     // printing error

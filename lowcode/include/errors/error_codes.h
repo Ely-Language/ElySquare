@@ -14,7 +14,9 @@ enum class ErrorCode {
     TypeNotRegistered=3,     // 3 - serialized/unpacked type not registered
     MailboxKeyNotFound=4,    // 4 - mailboxes key not found
     SafepointTimeout=5,      // 5 - thread didn't recognized GC stop command
-    ContainerContainsOther=6 // 6 - this container has no thing with that property
+    ContainerContainsOther=6,// 6 - this container has no thing with that property
+    InternalError=7,         // 7 - any bug with es code 
+    RuntimeError=8,          // 9 - dev-use
 };
 
 }

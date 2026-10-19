@@ -13,7 +13,7 @@ namespace stuff {
 
 static constexpr sizeT ALIGN_QUANTUM = 16;
 static constexpr sizeT MIN_BLOCK_SIZE = ALIGN_QUANTUM; 
-static constexpr sizeT NUM_BUCKETS = 32;
+static constexpr sizeT NUM_BUCKETS = 128;
 
 inline sizeT alignSize(sizeT size) noexcept {
     sizeT actual = (size < MIN_BLOCK_SIZE) ? MIN_BLOCK_SIZE : size;
@@ -35,7 +35,7 @@ private:
 
     ::es::Arena* arena;
 
-    Shape* lastAllocatedShape;
+    Shape* lastAllocatedShape = nullptr;
     
     FreeList* freeListHead[stuff::NUM_BUCKETS];
 public:

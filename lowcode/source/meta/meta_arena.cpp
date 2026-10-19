@@ -7,7 +7,7 @@ namespace ESLowcode {
 MetaArena::MetaArena(sizeT size, bool GC) {
     ::es::Arena* arena = new ::es::Arena(size, GC);
     if (!arena) [[unlikely]] { 
-        ::es::raiseble::warning(
+        ::es::raiseble::panic(
             ::es::ErrorCode::OutOfMemory,
             "Failed to create thread-local meta arena for Thread",
             "ElySquare/lowcode/meta/meta_arena.cpp",
@@ -33,6 +33,14 @@ void* MetaArena::metalloc(sizeT size, sizeT alignment) noexcept {
     
     // Cached (FreeLists)
     if (bucketIdx < stuff::NUM_BUCKETS && freeListHead[bucketIdx] != nullptr) {
+#ifdef DEBUG
+        if (alignment > stuff::ALIGN_QUANTUM) [[unlikely]]
+            ::es::raiseble::panic(
+                ::es::ErrorCode::InternalError,
+                "metalloc: alignment > ALIGN_QUANTUM cannot be served from free list",
+                __FILE__, __LINE__
+            );
+#endif
         FreeList* node = freeListHead[bucketIdx];
         freeListHead[bucketIdx] = node->next;
         return static_cast<void*>(node);
@@ -58,11 +66,31 @@ void MetaArena::metarecycle(void* ptr, sizeT size) noexcept {
     sizeT actualSize = stuff::alignSize(size);
     sizeT bucketIdx = stuff::getBucketIndex(actualSize);
 
-    if (bucketIdx < stuff::NUM_BUCKETS) {
-        FreeList* node = static_cast<FreeList*>(ptr);
-        node->next = freeListHead[bucketIdx];
-        freeListHead[bucketIdx] = node;
+    if (bucketIdx >= stuff::NUM_BUCKETS) {
+#ifdef DEBUG
+        ::es::raiseble::warning(
+            ::es::ErrorCode::InternalError,
+            "Block too large for free list, memory not reused",
+            __FILE__, __LINE__
+        );
+#endif
+        return;
     }
+
+#ifdef DEBUG
+    for (FreeList* n = freeListHead[bucketIdx]; n; n = n->next) {
+        if (n == ptr) [[unlikely]]
+            ::es::raiseble::panic(
+                ::es::ErrorCode::InternalError,
+                "metarecycle: double free detected",
+                __FILE__, __LINE__
+            );
+    }
+#endif
+
+    FreeList* node = static_cast<FreeList*>(ptr);
+    node->next = freeListHead[bucketIdx];
+    freeListHead[bucketIdx] = node;
 }
 
 }

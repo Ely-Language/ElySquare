@@ -20,7 +20,8 @@ const uint16_t IS_GETTER = 0x04; // ...0100 = 4
 const uint16_t IS_SETTER = 0x08; // ...1000 = 8
 }
 
-namespace shapeFlags {    
+namespace shapeFlags {  
+const uint16_t MASK = 0x15;              // ...1111 = 15  
 const uint16_t IS_MARKED_ALIVE = 0x01;   // ...0001 = 1
 const uint16_t HAS_ACCESSORS = 0x02;     // ...0010 = 2
 const uint16_t IS_FROZEN = 0x04;         // ...0100 = 4
@@ -302,6 +303,45 @@ inline uint16_t getShapeChainDepth(Shape* shape) {
         depth++; 
     }
     return depth;
+}
+
+// Cash & Versioning
+
+#define SHAPE_EPOCH_RAW_MASK 0x4095 // 0000111111111111
+
+inline uint16_t getShapeEpoche(Shape* shape) {
+    if (shape == nullptr) [[unlikely]] {
+        ::es::raiseble::warning(
+            ::es::ErrorCode::InternalError,
+            "Couldn't return epoche of non-exist shape!",
+            __FILE__,
+            __LINE__ - 4
+        );
+        return 4095;
+    }
+    return (shape->shapeFlags >> 4);
+}
+
+inline void setShapeEpoche(
+    Shape* shape, // shape
+    uint16_t int12ValueOfEpoche // new epoche (0-4095)
+) {
+    if (shape == nullptr) [[unlikely]] {
+        ::es::raiseble::warning(
+            ::es::ErrorCode::InternalError,
+            "Couldn't set epoche of non-exist shape!",
+            __FILE__,
+            __LINE__ - 4
+        );
+        return;
+    }
+
+    int12ValueOfEpoche &= SHAPE_EPOCH_RAW_MASK;
+
+    int12ValueOfEpoche << 4;
+
+    shape->shapeFlags |= int12ValueOfEpoche;
+    return;
 }
 
 }

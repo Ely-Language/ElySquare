@@ -47,6 +47,8 @@ typedef double flt;
 
 typedef uint32_t atom;
 
+const atom brokenAtom = UINT32_MAX;
+
 // NULL ===========================================================================
 
 typedef void sentinel;

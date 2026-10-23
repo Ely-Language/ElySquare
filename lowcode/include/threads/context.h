@@ -3,11 +3,14 @@
 
 #include <include/meta/meta_arena.h>
 #include <include/meta/shape_map.h>
+#include <include/meta/starid.h>
 
 namespace es {
 
 class ThreadContext {
 private:
+    sizeT maxStarIdCount;
+
     // Meta Arena
     ::ESLowcode::MetaArena* metaArena;
 
@@ -18,23 +21,23 @@ private:
     ::ESLowcode::Shape* rootShape;
 
     // Arena-Local Atom Registry
-    ::ESLowcode::MetaArena* alar;
+    ::ESLowcode::ALAR* alar;
 
 public:
     ThreadContext();
     ~ThreadContext();
 
     // returns thread's meta arena
-    ::ESLowcode::MetaArena& getMetaArene();
+    ::ESLowcode::MetaArena* getMetaArene();
 
     // returns thread-local allocation buffer of current thread
-    ::es::TLAB& getTLAB();
+    ::es::TLAB* getTLAB();
 
     // returns the root shape of this thread
-    ::ESLowcode::Shape& getRootShape();
+    ::ESLowcode::Shape* getRootShape();
 
     // returns the alar of the tread
-    ::ESLowcode::MetaArena& getALAR();
+    ::ESLowcode::ALAR* getALAR();
 };
 
 ThreadContext* getThread();

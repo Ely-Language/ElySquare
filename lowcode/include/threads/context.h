@@ -17,6 +17,9 @@ private:
     // Root Shape
     ::ESLowcode::Shape* rootShape;
 
+    // Arena-Local Atom Registry
+    ::ESLowcode::MetaArena* alar;
+
 public:
     ThreadContext();
     ~ThreadContext();
@@ -29,6 +32,9 @@ public:
 
     // returns the root shape of this thread
     ::ESLowcode::Shape& getRootShape();
+
+    // returns the alar of the tread
+    ::ESLowcode::MetaArena& getALAR();
 };
 
 ThreadContext* getThread();

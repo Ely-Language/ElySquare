@@ -13,6 +13,7 @@ ALAR::ALAR(::ESLowcode::MetaArena* arenaCreatingIn, ushort starIDMaxCount) {
     }
 
     const sizeT arenaStarIDSize = sizeof(ALAR::StarPlace) * starIDMaxCount;
+    const sizeT hashCacheSize = sizeof(umore) * starIDMaxCount;
 
     void* ptr = arenaCreatingIn->metalloc(
         sizeof(::ESLowcode::MetaArena),
@@ -46,6 +47,22 @@ ALAR::ALAR(::ESLowcode::MetaArena* arenaCreatingIn, ushort starIDMaxCount) {
 
     this->placelist = new (placeListPtr) StarPlace[starIDMaxCount]();
     
+    void* hashCachePtr = this->arena->metalloc(
+        hashCacheSize,
+        alignof(umore)
+    );
+
+    if (hashCachePtr == nullptr) [[unlikely]] {
+        ::es::raiseble::panic(
+            ::es::ErrorCode::OutOfMemory,
+            "Couldn't create ALAR for Thread: there is no memory",
+            __FILE__,
+            __LINE__ - 10
+        );
+    }
+
+    this->hashCache = new (hashCachePtr) umore[starIDMaxCount]();
+
     void* idmapPtr = this->arena->metalloc(
         sizeof(ubyte) * starIDMaxCount, 
         alignof(ubyte)
@@ -100,11 +117,20 @@ atom ALAR::getNewStarId() {
     return this->numToStarId(createdPlacesCount++);
 }
 
-atom ALAR::getStarIdOf(const char* raw) {
-    for (ushort i; i < createdPlacesCount; i++) {
-        StarPlace place = placelist[i];
-        if (::std::strcmp(*place.ptr, raw) == 0) {
-            return numToStarId(i);
+atom ALAR::getStarIdOf(const char* raw, sizeT length) {
+    if (!raw) return brokenAtom;
+    if (length == 0) length = std::strlen(raw);
+
+    const uint64_t targetHash = stuff::hashString(raw, length);
+
+    for (ushort i = 0; i < createdPlacesCount; i++) {
+        if (idmap[i] == 0) continue;
+
+        if (hashCache[i] == targetHash) {
+            StarPlace place = placelist[i];
+            if (place.len() == length && std::memcmp(*(place.ptr), raw, length) == 0) {
+                return numToStarId(i);
+            }
         }
     }
 
@@ -121,15 +147,24 @@ atom ALAR::getStarIdOf(const char* raw) {
 }
 
 atom ALAR::staridize(char* text, sizeT length) {
-    atom forFound = getStarIdOf(text);
+    atom forFound = getStarIdOf(text, length);
     
     // fast path
     if (forFound != brokenAtom) return forFound;
 
     // slow path
-    ushort i;
-    while (idmap[i] != 0) {
+    ushort i = 0;
+    while (i < starIDMaxCount && idmap[i] != 0) {
         i++;
+    }
+
+    if (i >= starIDMaxCount) {
+        ::es::raiseble::panic(
+            ::es::ErrorCode::OutOfMemory,
+            "ALAR of Thread is full!",
+            __FILE__,
+            __LINE__ - 5
+        );
     }
 
     void* textPtr = arena->metalloc((sizeof(char) * length), alignof(char));
@@ -144,16 +179,20 @@ atom ALAR::staridize(char* text, sizeT length) {
     }
 
     char* refText = new (textPtr) char();
-    refText = text;
+    std::memcpy(refText, text, length);
+    refText[length] = '\0';
 
-    if (idmap[i+1] == 1) { // reuse
-        placelist[i].ptr = &refText;
-        placelist[i].lenAndMark = length | ~stuff::stringFlags::GC_MARK_RAW_MASK;
-    } else { // creating
-        StarPlace place = StarPlace();
-        place.ptr = &refText;
-        place.lenAndMark = length | ~stuff::stringFlags::GC_MARK_RAW_MASK;
-        placelist[i] = place;
+    void* ppTextPtr = arena->metalloc(sizeof(char*), alignof(char*));
+    char** ptrToRef = new (ppTextPtr) char*(refText);
+
+    placelist[i].ptr = ptrToRef;
+    placelist[i].setLen(length);
+    
+    hashCache[i] = stuff::hashString(refText, length);
+    
+    idmap[i] = 1;
+    if (i >= createdPlacesCount) {
+        createdPlacesCount = i + 1;
     }
 
     idmap[i] = 1;
@@ -180,12 +219,14 @@ sizeT ALAR::lenOf(atom starID) {
 sizeT ALAR::sweepPlaces() {
     sizeT killed = 0;
     for (ushort i = 0; i < createdPlacesCount; i++) {
-        if (placelist[i].isMarkedAlive()) {
+        if (idmap[i] != 0 && !placelist[i].isMarkedAlive()) {
             StarPlace place = placelist[i];
             arena->metarecycle(*place.ptr, place.len());
             placelist->lenAndMark = 0;
             idmap[i] = 0;
             killed++;
+        } else if (idmap[i] != 0) {
+            placelist[i].setMarkedAlive(false);
         }
     }
     return killed;

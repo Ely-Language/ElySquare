@@ -25,6 +25,15 @@ namespace stringFlags {
 }
 constexpr char starIDCharset[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
+inline uint64_t hashString(const char* str, sizeT len) {
+    uint64_t hash = 14695981039346656037ULL;
+    for (sizeT i = 0; i < len; ++i) {
+        hash ^= static_cast<uint64_t>(str[i]);
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
 }
 
 // Arena-Local Atom Registry
@@ -47,7 +56,7 @@ private:
             if (mark) {
                 lenAndMark |= stuff::stringFlags::GC_MARK_RAW_MASK;
             } else {
-                lenAndMark &= stuff::stringFlags::GC_MARK_RAW_MASK;
+                lenAndMark &= ~stuff::stringFlags::GC_MARK_RAW_MASK;
             }
         }
 
@@ -59,6 +68,7 @@ private:
     ::ESLowcode::MetaArena* arena;
     
     StarPlace* placelist;
+    umore* hashCache;
     
     ushort starIDMaxCount;
     ubyte* idmap;
@@ -71,7 +81,8 @@ public:
     atom numToStarId(ushort num);
     ushort starIdToNum(atom starID);
     atom getNewStarId();
-    atom getStarIdOf(const char* raw);
+
+    atom getStarIdOf(const char* raw, sizeT length);
 
     atom staridize(char* text, sizeT length);
 
@@ -86,6 +97,7 @@ public:
 inline constexpr bool isSSO(sizeT len) {
     return (len < 8);
 }
+
 
 inline atom charToAtom(const char* text) {
     if (!text) return 0;
@@ -107,47 +119,46 @@ inline atom charToAtom(const char* text) {
 
         return stuff::stringFlags::STARID_STAR_MASK | static_cast<atom>(num);
     }
-
+    
     atom ssoVal = 0;
     ::std::memcpy(&ssoVal, text, ::std::min(size_t(4), ::std::strlen(text)));
-
+    
     ssoVal &= ~stuff::stringFlags::STARID_STAR_MASK;
     return ssoVal;
 }
 
-inline char* atomToChar(atom a) {
+inline void atomToBufferChar(atom a, char* outBuffer, sizeT bufferSize = 8) {
     if (a == brokenAtom) [[unlikely]] {
-        ::es::raiseble::panic(
-            ::es::ErrorCode::RuntimeError,
-            "Can't make char* from a broken atom!",
-            __FILE__,
-            __LINE__ - 5
-        );
+        return;
     }
-    char out[8];
     if ((a & stuff::stringFlags::STARID_STAR_MASK) != 0) {
         ushort num = static_cast<ushort>(a & stuff::stringFlags::STARID_INDEX_MASK);
 
-        out[0] = '*';
-        out[7] = '\0';
+        outBuffer[0] = '*';
+        outBuffer[7] = '\0';
 
         ubyte idx = 6;
         atom n = num;
 
         do {
-            out[idx--] = stuff::starIDCharset[n & 36];
+            outBuffer[idx--] = stuff::starIDCharset[n % 36]; // Исправлен баг с побитовым & 36 на % 36
             n /= 36;
         } while (n > 0 && idx > 0);
 
         while (idx > 0) {
-            out[idx--] = '0';
+            outBuffer[idx--] = '0';
         }
     } else {
-        ::std::memcpy(out, &a, 4);
-        out[4] = '\0';
+        ::std::memcpy(outBuffer, &a, std::min(size_t(4), bufferSize - 1));
+        outBuffer[4] = '\0';
     }
+}
 
-    return out;
+inline char atomToChar(atom a) {
+    char out[8];
+
+    atomToBufferChar(a, out, 8);
+    return *out;
 }
 
 
